@@ -2488,6 +2488,19 @@ public:
     return getValues(Operands);
   }
 
+  SPIRVCapVec getRequiredCapability() const override {
+    if (isDeviceBarrier()) {
+      return getVec(internal::CapabilityDeviceBarrierINTEL);
+    }
+    return SPIRVInstruction::getRequiredCapability();
+  }
+  std::optional<ExtensionID> getRequiredExtension() const override {
+    if (isDeviceBarrier()) {
+      return ExtensionID::SPV_INTEL_device_barrier;
+    }
+    return std::nullopt;
+  }
+
 protected:
   _SPIRV_DEF_ENCDEC3(ExecScope, MemScope, MemSema)
   void validate() const override {
@@ -2495,6 +2508,20 @@ protected:
     assert(WordCount == 4);
     SPIRVInstruction::validate();
   }
+
+  bool isDeviceBarrier() const {
+    if (!getModule()->isAllowedToUseExtension(
+            ExtensionID::SPV_INTEL_device_barrier))
+      return false;
+    SPIRVValue *ESV = getValue(ExecScope);
+    if (ESV && ESV->getOpCode() == OpConstant) {
+      if (static_cast<SPIRVConstant *>(ESV)->getZExtIntValue() != ScopeDevice) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   SPIRVId ExecScope;
   SPIRVId MemScope = SPIRVID_INVALID;
   SPIRVId MemSema = SPIRVID_INVALID;
@@ -4436,6 +4463,66 @@ public:
   std::optional<ExtensionID> getRequiredExtension() const override {
     return ExtensionID::SPV_INTEL_subgroup_matrix_multiply_accumulate;
   }
+
+protected:
+  void validate() const override {
+    SPIRVInstTemplateBase::validate();
+
+    // Check if FP4 or FP8 matrix operands are used
+    // Operands parameter is the last operand (index 4)
+    auto *NonConstThis =
+        const_cast<SPIRVSubgroupMatrixMultiplyAccumulateINTELInst *>(this);
+    if (NonConstThis->getOperands().size() > 4) {
+      const SPIRVConstant *OperandsConst =
+          static_cast<const SPIRVConstant *>(NonConstThis->getOperand(4));
+      uint64_t OperandsMask = OperandsConst->getZExtIntValue();
+
+      // FP4 operand bits
+      constexpr uint64_t FP4Mask =
+          spv::internal::
+              IMatrixMultiplyAccumulateOperandsMatrixAPackedFloat4E2M1INTELMask |
+          spv::internal::
+              IMatrixMultiplyAccumulateOperandsMatrixBPackedFloat4E2M1INTELMask;
+
+      // FP8 operand bits
+      constexpr uint64_t FP8Mask =
+          spv::internal::
+              IMatrixMultiplyAccumulateOperandsMatrixAPackedFloat8E4M3INTELMask |
+          spv::internal::
+              IMatrixMultiplyAccumulateOperandsMatrixBPackedFloat8E4M3INTELMask |
+          spv::internal::
+              IMatrixMultiplyAccumulateOperandsMatrixAPackedFloat8E5M2INTELMask |
+          spv::internal::
+              IMatrixMultiplyAccumulateOperandsMatrixBPackedFloat8E5M2INTELMask;
+
+      if ((OperandsMask & FP4Mask) != 0) {
+        getModule()->getErrorLog().checkError(
+            getModule()->isAllowedToUseExtension(
+                ExtensionID::
+                    SPV_INTEL_subgroup_matrix_multiply_accumulate_float4),
+            SPIRVEC_RequiresExtension,
+            "SPV_INTEL_subgroup_matrix_multiply_accumulate_float4\n"
+            "SubgroupMatrixMultiplyAccumulateINTEL with FP4 operand flags "
+            "requires this extension");
+        getModule()->addExtension(
+            ExtensionID::SPV_INTEL_subgroup_matrix_multiply_accumulate_float4);
+      }
+
+      if ((OperandsMask & FP8Mask) != 0) {
+        getModule()->getErrorLog().checkError(
+            getModule()->isAllowedToUseExtension(
+                ExtensionID::
+                    SPV_INTEL_subgroup_matrix_multiply_accumulate_float8),
+            SPIRVEC_RequiresExtension,
+            "SPV_INTEL_subgroup_matrix_multiply_accumulate_float8\n"
+            "SubgroupMatrixMultiplyAccumulateINTEL with FP8 operand flags "
+            "requires this extension");
+        getModule()->addExtension(
+            ExtensionID::SPV_INTEL_subgroup_matrix_multiply_accumulate_float8);
+      }
+    }
+  }
+
   SPIRVCapVec getRequiredCapability() const override {
     return getVec(CapabilitySubgroupMatrixMultiplyAccumulateINTEL);
   }
@@ -4600,5 +4687,20 @@ _SPIRV_OP(StochasticRoundFToF, true, 5, true)
 _SPIRV_OP(ClampStochasticRoundFToF, true, 5, true)
 _SPIRV_OP(ClampStochasticRoundFToS, true, 5, true)
 #undef _SPIRV_OP
+
+class SPIRVFmaKHRInstBase : public SPIRVInstTemplateBase {
+public:
+  SPIRVCapVec getRequiredCapability() const override {
+    return getVec(CapabilityFMAKHR);
+  }
+
+  std::optional<ExtensionID> getRequiredExtension() const override {
+    return ExtensionID::SPV_KHR_fma;
+  }
+};
+
+typedef SPIRVInstTemplate<SPIRVFmaKHRInstBase, OpFmaKHR, true, 6, false>
+    SPIRVFmaKHR;
+
 } // namespace SPIRV
 #endif // SPIRV_LIBSPIRV_SPIRVINSTRUCTION_H

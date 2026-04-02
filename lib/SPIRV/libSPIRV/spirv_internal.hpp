@@ -114,6 +114,7 @@ enum InternalCapability {
   ICapGlobalVariableDecorationsINTEL = 6146,
   ICapabilityTaskSequenceINTEL = 6162,
   ICapabilitySigmoidINTEL = 6167,
+  ICapabilityDeviceBarrierINTEL = 6185,
   ICapabilityCooperativeMatrixCheckedInstructionsINTEL = 6192,
   ICapabilityFloat4E2M1INTEL = 6212,
   ICapabilityFloat4E2M1CooperativeMatrixINTEL = 6213,
@@ -170,6 +171,18 @@ enum InternalFPEncoding {
 enum InternalBuiltIn {
   IBuiltInSubDeviceIDINTEL = 6135,
   IBuiltInGlobalHWThreadIDINTEL = 6136,
+  IBuiltInDeviceBarrierValidINTEL = 6186,
+};
+
+enum InternalMatrixMultiplyAccumulateOperandsMask {
+  // FP8 matrix operands
+  IMatrixMultiplyAccumulateOperandsMatrixAPackedFloat8E4M3INTELMask = 0x4000,
+  IMatrixMultiplyAccumulateOperandsMatrixBPackedFloat8E4M3INTELMask = 0x8000,
+  IMatrixMultiplyAccumulateOperandsMatrixAPackedFloat8E5M2INTELMask = 0x10000,
+  IMatrixMultiplyAccumulateOperandsMatrixBPackedFloat8E5M2INTELMask = 0x20000,
+  // FP4 matrix operands
+  IMatrixMultiplyAccumulateOperandsMatrixAPackedFloat4E2M1INTELMask = 0x40000,
+  IMatrixMultiplyAccumulateOperandsMatrixBPackedFloat4E2M1INTELMask = 0x80000,
 };
 
 #define _SPIRV_OP(x, y) constexpr x x##y = static_cast<x>(I##x##y);
@@ -204,6 +217,9 @@ _SPIRV_OP(Op, CooperativeMatrixStoreOffsetINTEL)
 
 _SPIRV_OP(Capability, CooperativeMatrixInvocationInstructionsINTEL)
 _SPIRV_OP(Op, CooperativeMatrixApplyFunctionINTEL)
+
+_SPIRV_OP(Capability, DeviceBarrierINTEL)
+_SPIRV_OP(BuiltIn, DeviceBarrierValidINTEL)
 
 _SPIRV_OP(Capability, HWThreadQueryINTEL)
 _SPIRV_OP(BuiltIn, SubDeviceIDINTEL)

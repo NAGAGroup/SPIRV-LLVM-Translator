@@ -349,6 +349,8 @@ template <> inline void SPIRVMap<BuiltIn, std::string>::init() {
   add(BuiltInMax, "BuiltInMax");
   add(internal::BuiltInSubDeviceIDINTEL, "BuiltInSubDeviceIDINTEL");
   add(internal::BuiltInGlobalHWThreadIDINTEL, "BuiltInGlobalHWThreadIDINTEL");
+  add(internal::BuiltInDeviceBarrierValidINTEL,
+      "BuiltInDeviceBarrierValidINTEL");
 }
 SPIRV_DEF_NAMEMAP(BuiltIn, SPIRVBuiltInNameMap)
 
@@ -655,6 +657,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilitySubgroupMatrixMultiplyAccumulateINTEL,
       "SubgroupMatrixMultiplyAccumulateINTEL");
   add(CapabilityTernaryBitwiseFunctionINTEL, "TernaryBitwiseFunctionINTEL");
+  add(CapabilityFMAKHR, "FMAKHR");
   // From spirv_internal.hpp
   add(internal::CapabilityTokenTypeINTEL, "TokenTypeINTEL");
   add(internal::CapabilityJointMatrixINTEL, "JointMatrixINTEL");
@@ -695,6 +698,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityFloat8CooperativeMatrixEXT, "Float8CooperativeMatrixEXT");
   add(internal::CapabilityPredicatedIOINTEL, "PredicatedIOINTEL");
   add(internal::CapabilitySigmoidINTEL, "SigmoidINTEL");
+  add(internal::CapabilityDeviceBarrierINTEL, "DeviceBarrierINTEL");
   add(internal::CapabilityFloat4E2M1INTEL, "Float4E2M1INTEL");
   add(internal::CapabilityFloat4E2M1CooperativeMatrixINTEL,
       "Float4E2M1CooperativeMatrixINTEL");

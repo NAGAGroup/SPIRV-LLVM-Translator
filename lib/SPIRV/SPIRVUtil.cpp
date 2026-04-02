@@ -625,6 +625,7 @@ static Type *parsePrimitiveType(LLVMContext &Ctx, StringRef Name) {
       .Cases("long", "unsigned long", Type::getInt64Ty(Ctx))
       .Cases("long long", "unsigned long long", Type::getInt64Ty(Ctx))
       .Case("half", Type::getHalfTy(Ctx))
+      .Case("std::bfloat16_t", Type::getBFloatTy(Ctx))
       .Case("float", Type::getFloatTy(Ctx))
       .Case("double", Type::getDoubleTy(Ctx))
       .Case("void", Type::getInt8Ty(Ctx))
@@ -804,6 +805,10 @@ parseNode(Module *M, const llvm::itanium_demangle::Node *ParamType,
       // struct types were are looking for here.
     }
   } else if (auto *VendorTy = dyn_cast<VendorExtQualType>(ParamType)) {
+    if (auto *NameTy = dyn_cast<NameType>(VendorTy->getTy())) {
+      if (NameTy->getName() == "std::bfloat16_t")
+        PointeeTy = llvm::Type::getBFloatTy(M->getContext());
+    }
     // This is a block parameter. Decode the pointee type as if it were a
     // void (*)(void) function pointer type.
     if (VendorTy->getExt() == "block_pointer") {
@@ -2059,13 +2064,15 @@ static void replaceUsesOfBuiltinVar(Value *V, const APInt &AccumulatedOffset,
     } else if (auto *Load = dyn_cast<LoadInst>(U)) {
       // Figure out which index the accumulated offset corresponds to. If we
       // have a weird offset (e.g., trying to load byte 7), bail out.
-      Type *ScalarTy = ReplacementFunc->getReturnType();
       APInt Index;
-      uint64_t Remainder;
-      APInt::udivrem(AccumulatedOffset, ScalarTy->getScalarSizeInBits() / 8,
-                     Index, Remainder);
-      if (Remainder != 0)
-        llvm_unreachable("Illegal GEP of a SPIR-V builtin variable");
+      Type *ScalarTy = ReplacementFunc->getReturnType();
+      if (!ScalarTy->isIntegerTy(1)) {
+        uint64_t Remainder;
+        APInt::udivrem(AccumulatedOffset, ScalarTy->getScalarSizeInBits() / 8,
+                       Index, Remainder);
+        if (Remainder != 0)
+          llvm_unreachable("Illegal GEP of a SPIR-V builtin variable");
+      }
 
       IRBuilder<> Builder(Load);
       Value *Replacement;
@@ -2446,6 +2453,7 @@ public:
       addUnsignedArg(3);
       break;
     case OpGroupAsyncCopy:
+      setArgAttr(2, SPIR::ATTR_CONST);
       addUnsignedArg(3);
       addUnsignedArg(4);
       break;
@@ -2589,6 +2597,9 @@ public:
     case internal::OpConvertHandleToSampledImageINTEL:
       addUnsignedArg(0);
       break;
+    case OpGenericPtrMemSemantics:
+      setArgAttr(0, SPIR::ATTR_CONST);
+      break;
     default:;
       // No special handling is needed
     }
@@ -2603,7 +2614,7 @@ class OpenCLStdToSPIRVFriendlyIRMangleInfo : public BuiltinFuncMangleInfo {
 public:
   OpenCLStdToSPIRVFriendlyIRMangleInfo(OCLExtOpKind ExtOpId,
                                        ArrayRef<Type *> ArgTys, Type *RetTy)
-      : ExtOpId(ExtOpId), ArgTys(ArgTys) {
+      : ExtOpId(ExtOpId), ArgTys(ArgTys), RetTy(RetTy) {
 
     std::string Postfix = "";
     if (needRetTypePostfix())
@@ -2619,6 +2630,11 @@ public:
     case OpenCLLIB::Vloada_halfn:
     case OpenCLLIB::Vloadn:
       return true;
+    case OpenCLLIB::Nan:
+      // Only add return type mangling for bfloat16 to disambiguate from half
+      // (both are represented as i16 in LLVM). Float and half use traditional
+      // naming for backward compatibility.
+      return RetTy->getScalarType()->isBFloatTy();
     default:
       return false;
     }
@@ -2660,6 +2676,22 @@ public:
     case OpenCLLIB::Shuffle2:
       addUnsignedArg(2);
       break;
+    case OpenCLLIB::Vloadn:
+    case OpenCLLIB::Vload_half:
+    case OpenCLLIB::Vload_halfn:
+    case OpenCLLIB::Vloada_halfn:
+      addUnsignedArg(0);
+      setArgAttr(1, SPIR::ATTR_CONST);
+      break;
+    case OpenCLLIB::Vstoren:
+    case OpenCLLIB::Vstore_half:
+    case OpenCLLIB::Vstore_half_r:
+    case OpenCLLIB::Vstore_halfn:
+    case OpenCLLIB::Vstore_halfn_r:
+    case OpenCLLIB::Vstorea_halfn:
+    case OpenCLLIB::Vstorea_halfn_r:
+      addUnsignedArg(1);
+      break;
     default:;
       // No special handling is needed
     }
@@ -2668,6 +2700,7 @@ public:
 private:
   OCLExtOpKind ExtOpId;
   ArrayRef<Type *> ArgTys;
+  Type *RetTy;
 };
 } // namespace
 
